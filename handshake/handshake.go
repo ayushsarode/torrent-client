@@ -3,7 +3,6 @@ package handshake
 import (
 	"fmt"
 	"io"
-	"torrent_client/handshake"
 )
 
 type Handshake struct {

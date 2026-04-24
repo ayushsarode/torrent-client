@@ -4,21 +4,22 @@ import (
 	"encoding/binary"
 	"errors"
 	"net"
+	"strconv"
 )
 
 type Peer struct {
-	IP	net.IP
-	Port	uint16
+	IP   net.IP
+	Port uint16
 }
 
 // this func parses peer IP addr and ports from a buffer.
 // basically convert binary format to struct, that means we cant directly dial to http with these bytes.
-func Unmarshal(peersBin []byte)([]Peer, error) {
+func Unmarshal(peersBin []byte) ([]Peer, error) {
 	const peerSize = 6 // 4 byte for IP and 2 byte for port
 
 	numPeers := len(peersBin) / peerSize
 
-	if len(peersBin) % peerSize != 0 {
+	if len(peersBin)%peerSize != 0 {
 		err := errors.New("Received malformed peers")
 		return nil, err
 	}
@@ -27,8 +28,12 @@ func Unmarshal(peersBin []byte)([]Peer, error) {
 
 	for i := 0; i < numPeers; i++ {
 		offset := i * peerSize
-		peers[i].IP = net.IP(peersBin[offset : offset + 4])
+		peers[i].IP = net.IP(peersBin[offset : offset+4])
 		peers[i].Port = binary.BigEndian.Uint16(peersBin[offset+4 : offset+6])
 	}
 	return peers, nil
+}
+
+func (p Peer) String() string {
+	return net.JoinHostPort(p.IP.String(), strconv.Itoa(int(p.Port)))
 }

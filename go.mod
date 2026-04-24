@@ -1,4 +1,4 @@
-module torrent_client
+module github.com/ayushsarode/torrent-client
 
 go 1.25.0
 
