@@ -1,9 +1,19 @@
 package torrentfile
 
 import (
+	"net/http"
 	"net/url"
 	"strconv"
+	"time"
+
+	"github.com/ayushsarode/torrent-client/peers"
+	"github.com/jackpal/bencode-go"
 )
+
+type bencodeTrackerResp struct {
+	Interval int    `bencode:"interval"`
+	Peers    string `bencode:"peers"`
+}
 
 func (t *Torrentfile) buildTrackerURL(peerID [20]byte, port uint16) (string, error) {
 	base, err := url.Parse(t.Annouce)
@@ -12,20 +22,42 @@ func (t *Torrentfile) buildTrackerURL(peerID [20]byte, port uint16) (string, err
 	}
 
 	params := url.Values{
-		"info_hash": []string{string(t.InfoHash[:])},
-		"peer_id": []string{string(peerID[:])},
-		"port": []string{string(port)},
-		"uploaded": []string{"0"},
+		"info_hash":  []string{string(t.InfoHash[:])},
+		"peer_id":    []string{string(peerID[:])},
+		"port":       []string{string(port)},
+		"uploaded":   []string{"0"},
 		"downloaded": []string{"0"},
-		"compact": []string{"1"},
-		"left": []string{strconv.Itoa(t.Length)},
+		"compact":    []string{"1"},
+		"left":       []string{strconv.Itoa(t.Length)},
 	}
 
 	base.RawQuery = params.Encode()
 	return base.String(), nil
 }
 
-func (t *Torrentfile) requestPeers(peerID [20] byte, port uint16) ([]Peer, error) {
-	const peerSize = 6;
-	numPeers := len()
+func (t *Torrentfile) requestPeers(peerID [20]byte, port uint16) ([]peers.Peer, error) {
+	url, err := t.buildTrackerURL(peerID, port)
+
+	if err != nil {
+		return nil, err
+	}
+
+	c := &http.Client{Timeout: 15 * time.Second}
+
+	resp, err := c.Get(url)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	trackerResp := bencodeTrackerResp{}
+
+	err = bencode.Unmarshal(resp.Body, &trackerResp)
+	if err != nil {
+		return nil, err
+	}
+
+	return peers.Unmarshal([]byte(trackerResp.Peers))
 }

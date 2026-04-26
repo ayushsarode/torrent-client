@@ -4,36 +4,33 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"fmt"
-	"io"
 	"os"
-	"path"
 
 	"github.com/jackpal/bencode-go"
 )
 
-
 type Torrentfile struct {
-	Annouce string
-	InfoHash [20]byte
+	Annouce     string
+	InfoHash    [20]byte
 	PieceHashes [][20]byte
 	PieceLength int
-	Length int
-	Name string
+	Length      int
+	Name        string
 }
 
 type bencodeInfo struct {
-	Pieces string `bencode:"pieces"`
-	PieceLength int `bencode:"piece length"`
-	Length int `bencode:"length"`
-	Name string `bencode:"name"`
+	Pieces      string `bencode:"pieces"`
+	PieceLength int    `bencode:"piece length"`
+	Length      int    `bencode:"length"`
+	Name        string `bencode:"name"`
 }
 
 type bencodeTorrent struct {
-	Annouce string `bencode:"announce"`
-	Info bencodeInfo `bencode:"info"`
+	Annouce string      `bencode:"announce"`
+	Info    bencodeInfo `bencode:"info"`
 }
 
-func Open(path string) (Torrentfile, error)  {
+func Open(path string) (Torrentfile, error) {
 	file, err := os.Open(path)
 
 	if err != nil {
@@ -43,11 +40,13 @@ func Open(path string) (Torrentfile, error)  {
 
 	bto := bencodeTorrent{}
 
-	err = bencode.Unmarshal(file,err)
+	err = bencode.Unmarshal(file, err)
 
-	if  err != nil {
+	if err != nil {
 		return Torrentfile{}, err
 	}
+
+	return bto.toTorrentFile()
 }
 
 func (i *bencodeInfo) hash() ([20]byte, error) {
@@ -62,23 +61,45 @@ func (i *bencodeInfo) hash() ([20]byte, error) {
 	h := sha1.Sum(buf.Bytes())
 
 	return h, nil
-} 
+}
 
 func (i *bencodeInfo) splitPieceHashes() ([][20]byte, error) {
 	hashLen := 20
 
 	buf := []byte(i.Pieces)
 
-	if len(buf) % hashLen != 0 {
+	if len(buf)%hashLen != 0 {
 		err := fmt.Errorf("Received malformed pieces of lenght %d", len(buf))
-		return nil
+		return nil, err
 	}
 
 	numHashes := len(buf) / hashLen
-	hashes := make([][20]byte, numHashes) 
+	hashes := make([][20]byte, numHashes)
 
-	fori i := 0;i < numHashes; i++ {
-		copy
+	for i := 0; i < numHashes; i++ {
+		copy(hashes[i][:], buf[i*hashLen:(i+1)*hashLen])
+	}
+	return hashes, nil
+}
+
+func (bto *bencodeTorrent) toTorrentFile() (Torrentfile, error) {
+	infoHash, err := bto.Info.hash()
+	if err != nil {
+		return Torrentfile{}, err
 	}
 
+	pieceHashes, err := bto.Info.splitPieceHashes()
+	if err != nil {
+		return Torrentfile{}, err
+	}
+
+	t := Torrentfile{
+		Annouce:     bto.Annouce,
+		InfoHash:    infoHash,
+		PieceHashes: pieceHashes,
+		PieceLength: bto.Info.PieceLength,
+		Length:      bto.Info.Length,
+		Name:        bto.Info.Name,
+	}
+	return t, nil
 }
