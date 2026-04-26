@@ -39,7 +39,7 @@ func completeHandshake(conn net.Conn, infoHash, peerID [20]byte) (*handshake.Han
 	}
 
 	if !bytes.Equal(res.InfoHash[:], infoHash[:]) {
-		return nil, fmt.Errorf("Expected info hash %x", res.InfoHash, infoHash)
+		return nil, fmt.Errorf("Expected info hash %x but got %x", res.InfoHash, infoHash)
 	}
 
 	return res, nil
@@ -50,18 +50,23 @@ func recvBitfield(conn net.Conn) (bitfield.Bitfield, error) {
 	conn.SetDeadline(time.Now().Add(5 * time.Second))
 	defer conn.SetDeadline(time.Time{}) //disable the deadline
 
-	msg, err := message.Read(conn)
+	for {
+		msg, err := message.Read(conn)
+		if err != nil {
+			return nil, err
+		}
 
-	if err != nil {
-		return nil, err
+		if msg == nil {
+			continue
+		}
+
+		if msg.ID != message.MsgBitfield {
+			err := fmt.Errorf("Expected bitfield but got ID %d", msg.ID)
+			return nil, err
+		}
+
+		return msg.Payload, nil
 	}
-
-	if msg.ID != message.MsgBitfield {
-		err := fmt.Errorf("Expected bitfield but got ID %d", msg.ID)
-		return nil, err
-	}
-
-	return msg.Payload, nil
 }
 
 // This connects with a peer, completes a handshakes, and recieves a handshakes

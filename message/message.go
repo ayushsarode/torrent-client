@@ -106,7 +106,7 @@ func (m *Message) Serialize() []byte {
 	buf := make([]byte, 4+length)
 	binary.BigEndian.PutUint32(buf[0:4], length)
 	buf[4] = byte(m.ID)
-	copy(buf[:5], m.Payload)
+	copy(buf[5:], m.Payload)
 	return buf
 }
 
@@ -135,7 +135,7 @@ func Read(r io.Reader) (*Message, error) {
 
 	m := Message{
 		ID:      messageID(messageBuf[0]),
-		Payload: messageBuf[:1],
+		Payload: messageBuf[1:],
 	}
 
 	return &m, nil
@@ -168,4 +168,12 @@ func (m *Message) name() string {
 	default:
 		return fmt.Sprintf("Unknown#%d", m.ID)
 	}
+}
+
+func (m *Message) String() string {
+	if m == nil {
+		return m.name() 
+	}
+
+	return fmt.Sprintf("%s [%d]", m.name(),len(m.Payload))
 }

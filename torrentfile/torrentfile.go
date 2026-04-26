@@ -2,12 +2,17 @@ package torrentfile
 
 import (
 	"bytes"
+	"crypto/rand"
 	"crypto/sha1"
 	"fmt"
+	"log"
 	"os"
 
+	"github.com/ayushsarode/torrent-client/p2p"
 	"github.com/jackpal/bencode-go"
 )
+
+const Port uint16 = 6881
 
 type Torrentfile struct {
 	Annouce     string
@@ -30,6 +35,50 @@ type bencodeTorrent struct {
 	Info    bencodeInfo `bencode:"info"`
 }
 
+// DownloadToFile downloads a torrent and writes it to a file
+func (t *Torrentfile) DownloadToFile(path string) error {
+	var peerID [20]byte
+	_, err := rand.Read(peerID[:])
+	if err != nil {
+		return err
+	}
+
+	peers, err := t.requestPeers(peerID, Port)
+	if err != nil {
+		return err
+	}
+	if len(peers) == 0 {
+		return fmt.Errorf("tracker returned no peers")
+	}
+
+	log.Printf("Tracker returned %d peers\n", len(peers))
+
+	torrent := p2p.Torrent{
+		Peers:       peers,
+		PeerID:      peerID,
+		InfoHash:    t.InfoHash,
+		PieceHashes: t.PieceHashes,
+		PieceLength: t.PieceLength,
+		Length:      t.Length,
+		Name:        t.Name,
+	}
+	buf, err := torrent.Download()
+	if err != nil {
+		return err
+	}
+
+	outFile, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer outFile.Close()
+	_, err = outFile.Write(buf)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func Open(path string) (Torrentfile, error) {
 	file, err := os.Open(path)
 
@@ -40,7 +89,7 @@ func Open(path string) (Torrentfile, error) {
 
 	bto := bencodeTorrent{}
 
-	err = bencode.Unmarshal(file, err)
+	err = bencode.Unmarshal(file, &bto)
 
 	if err != nil {
 		return Torrentfile{}, err

@@ -24,7 +24,7 @@ func (t *Torrentfile) buildTrackerURL(peerID [20]byte, port uint16) (string, err
 	params := url.Values{
 		"info_hash":  []string{string(t.InfoHash[:])},
 		"peer_id":    []string{string(peerID[:])},
-		"port":       []string{string(port)},
+		"port":       []string{strconv.Itoa(int(port))},
 		"uploaded":   []string{"0"},
 		"downloaded": []string{"0"},
 		"compact":    []string{"1"},
